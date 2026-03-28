@@ -1,0 +1,101 @@
+# ROS2 Hexapod Gazebo
+
+This repository contains a ROS2 launch file to load the robot on Gazebo and control it.
+
+For a complete overview of the project refer to the [main Hexapod repository](https://github.com/ggldnl/Hexapod.git).
+
+## 🛠️ Setup
+
+Prerequisite: having Gazebo and some other packages installed:
+
+```bash
+sudo apt update
+sudo apt install ros-<your-distro>-ros-gz-sim
+sudo apt install ros-<your-distro>-ros-gz-bridge
+sudo apt install ros-<your-distro>-joint-state-broadcaster
+sudo apt install ros-<your-distro>-ros2-control
+sudo apt install ros-<your-distro>-ros2-controllers
+sudo apt install ros-<your-distro>-forward-command-controller
+```
+
+### Clone the repo
+
+Clone the repo. For simplicity, I will assume the ROS workspace is in the `home` folder. 
+A ROS best practice is to put any packages in the workspace into the `src` directory.
+
+```bash
+cd ~/ros_ws/src  # use your actual ROS workspace
+git clone --recurse-submodules https://github.com/ggldnl/Hexapod-Gazebo.git
+```
+
+### Build the package 
+
+```bash
+cd ~/ros_ws
+colcon build --packages-select hexapod_gazebo
+source install/setup.bash
+```
+
+## 🚀 Delpoy
+
+- Launch the [controller node](https://github.com/ggldnl/Hexapod-ROS-Python.git) on the hexapod. This will listen to `/hexapod/cmd_vel` and `/hexapod/cmd_pose`, control the robot accordingly and stream `/hexapod/odom` and `/hexapod/joint_values` (among other things).
+  ```bash
+  ros2 run hexapod_controller hexapod_controller
+  ```
+
+- Launch the simulation:
+  ```bash
+  ros2 launch hexapod_gazebo gazebo.launch.py
+  ```
+
+The launch file will:
+  - Start Gazebo simulator
+  - Load the hexapod URDF with physics plugin
+  - Spawn the robot
+  - Activate the forward_command_controller and joint_state_broadcaster
+  - Start the bridge node listening on /hexapod/joint_values
+
+You can check controller status with:
+```bash
+ros2 control list_controllers
+```
+
+## 🎛 Controlling the hexapod manually
+
+Note: commands are fire-and-forget.
+
+- Move forward at 100 mm/s:
+  ```bash
+  ros2 topic pub /hexapod/cmd_vel geometry_msgs/msg/Twist "{linear: {x: 100.0, y: 0.0, z: 0.0}, angular: {z: 0.0}}" --once
+  ```
+
+- Change body pose:
+  ```bash
+  ros2 topic pub /hexapod/cmd_pose geometry_msgs/msg/Pose "{position: {x: 0.0, y: 0.0, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: 0.0871557, w: 0.9961947}}" --once
+  ```
+  If you need a specific roll/pitch/yaw, convert to quaternion first (ROS uses quaternions, not Euler angles).  
+
+## 🕹️ Controlling the hexapod with a joystick
+
+- Launch `joy_node` on your machine. You can use `ls /dev/input/js*` to know the device id.
+  ```bash
+  ros2 run joy joy_node --ros-args -p device_id:=0 
+  ```
+
+- Launch `teleop_twist_joy` on your machine. Adapt this command to match your controller. You can launch the node with no arguments and listen to `/joy` to know what button does what. The `-r` argument repams `/cmd_vel` to `/hexapod/cmd_vel`.
+  ```bash
+  ros2 run teleop_twist_joy teleop_node \
+    --ros-args \
+    -p axis_linear.x:=1 \
+    -p axis_angular.yaw:=0 \
+    -p enable_button:=2 \
+    -p scale_linear.x:=250.0 \
+    -p scale_angular.yaw:=50.0 \
+    -r /cmd_vel:=/hexapod/cmd_vel
+  ```
+
+You should see the hexapod move on Gazebo.
+
+## 🤝 Contribution
+
+Feel free to contribute by opening issues or submitting pull requests. For further information, check out the [main Hexapod repository](https://github.com/ggldnl/Hexapod). Give a ⭐️ to this project if you liked the content.

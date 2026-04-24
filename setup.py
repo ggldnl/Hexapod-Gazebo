@@ -49,7 +49,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            f"joint_command_bridge = {package_name}.joint_command_bridge:main"
+            f"joint_command_bridge = {package_name}.joint_command_bridge:main",
+            f"joy_teleop = {package_name}.joy_teleop_node:main",
         ],
     },
 )

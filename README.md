@@ -54,10 +54,10 @@ source install/setup.bash
 
 The launch file will:
   - Start Gazebo simulator
-  - Load the hexapod URDF with physics plugin
   - Spawn the robot
   - Activate the forward_command_controller and joint_state_broadcaster
-  - Start the bridge node listening on /hexapod/joint_values
+  - Start a bridge node listening on /hexapod/joint_values to update the simulation
+  - Start a node listening to Joy messages to produce /hexapod/cmd_vel_norm and /hexapod/cmd_height messages
 
 You can check controller status with:
 ```bash
@@ -79,26 +79,44 @@ Note: commands are fire-and-forget.
   ```
   If you need a specific roll/pitch/yaw, convert to quaternion first (ROS uses quaternions, not Euler angles).  
 
-## 🕹️ Controlling the hexapod with a joystick
+## 🕹️ Controlling the Hexapod with a controller
+
+### Using standard nodes
+
+This is not the intended way to control the Hexapod. Skip to [the next section](README.md#using-my-custom-node).
 
 - Launch `joy_node` on your machine. You can use `ls /dev/input/js*` to know the device id.
   ```bash
   ros2 run joy joy_node --ros-args -p device_id:=0 
   ```
 
-- Launch `teleop_twist_joy` on your machine. Adapt this command to match your controller. You can launch the node with no arguments and listen to `/joy` to know what button does what. The `-r` argument repams `/cmd_vel` to `/hexapod/cmd_vel`.
+- Launch `teleop_twist_joy` on your machine. Adapt this command to match your controller. You can launch the node with no arguments and listen to `/joy` to know what button does what. The `-r` argument repams `/cmd_vel` to `/hexapod/cmd_vel_norm`. The `norm` variant of this command accepts messages with normalized velocity (range -1, 1); you can publish actual velocities on `/hexapod/cmd_vel` instead. 
   ```bash
   ros2 run teleop_twist_joy teleop_node \
     --ros-args \
-    -p axis_linear.x:=1 \
-    -p axis_angular.yaw:=0 \
-    -p enable_button:=2 \
-    -p scale_linear.x:=250.0 \
-    -p scale_angular.yaw:=50.0 \
-    -r /cmd_vel:=/hexapod/cmd_vel
+    -p axis_linear.x:=1 \  # left joystick axis 1 for backward/forward movement
+    -p axis_linear.y:=0 \  # left joystick axis 0 for right/left movement
+    -p axis_angular.yaw:=3 \  # right joystick axis 2 for clockwise/counterclockwise rotation during gait
+    -p enable_button:=5 \  # enable button, should be pressed at all times
+    -p scale_linear.x:=1.0 \
+    -p scale_linear.y:=1.0 \
+    -p scale_angular.yaw:=1.0 \
+    -r /cmd_vel:=/hexapod/cmd_vel_norm
   ```
 
-You should see the hexapod move on Gazebo.
+  Mine was an old PS3 controller. You can check the mapping for your controller with:
+  ```bash
+  ros2 topic echo /joy
+  ```
+
+### Using my custom node
+
+The Gazebo launch file also launches a custom node that should allow for better interaction with the hexapod. Using `teleop_twist_joy` we are bound to produce only `/cmd_vel` commands (mapped to `/hexapod/cmd_vel_norm`) but we might also want to control the body pose on a different topic. The custom node provides a way to do this.
+If you don't want to use Gazebo and you are interested only into controlling the Hexapod with a controller, you can launch the node by itself:
+
+```
+ros2 launch hexapod_gazebo joy_teleop.launch.py joy_device_id:=0
+```
 
 ## 🤝 Contribution
 

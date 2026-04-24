@@ -56,12 +56,34 @@ def generate_launch_description():
     with open("/tmp/enriched_robot.urdf", "w") as f:
         f.write(robot_description)
 
+    """
+    # No need for use_sim_time=True in this setup: the timing is 
+    # controller by the robot, Gazebo is just a visualizer with
+    # physics.
     use_sim_time_arg = DeclareLaunchArgument(
         "use_sim_time",
-        default_value="true",
+        default_value="false",
         description="Use Gazebo simulation clock",
     )
     use_sim_time = LaunchConfiguration("use_sim_time")
+    """
+
+    device_id_arg = DeclareLaunchArgument(
+        'joy_device_id',
+        default_value='0',
+        description='Joystick device ID (run joy_enumerate_devices to list available devices)',
+    )
+
+    joy_teleop = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource([
+            PathJoinSubstitution([
+                FindPackageShare('hexapod_gazebo'), 'launch', 'joy_teleop.launch.py'
+            ])
+        ]),
+        launch_arguments={
+            'joy_device_id': LaunchConfiguration('joy_device_id'),
+        }.items(),
+    )
 
     gz_sim = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([
@@ -81,20 +103,28 @@ def generate_launch_description():
         output="screen",
         parameters=[{
             "robot_description": robot_description,
-            "use_sim_time": use_sim_time,
+            # "use_sim_time": use_sim_time,
+            "use_sim_time": True,
         }],
         # Publishes to /controller_manager/robot_description so the
         # controller_manager receives the URDF over the topic it subscribes to.
         remappings=[("/robot_description", "/controller_manager/robot_description")],
     )
 
+    """
     # Bridge /clock so nodes using use_sim_time receive Gazebo time.
+    # In this architecture, the robot is the source of truth: listens
+    # for commands, computes joint values and applies/streams them.
+    # This node bridges /clock from Gazebo into ROS so that nodes 
+    # using use_sim_time=True can receive simulation time, but no
+    # node should use use_sim_time=True in this setup.
     clock_bridge = Node(
         package="ros_gz_bridge",
         executable="parameter_bridge",
         output="screen",
         arguments=["/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock"],
     )
+    """
 
     # Spawn the robot. Depends on robot_state_publisher being up, which starts immediately,
     # so the 3s delay is sufficient.
@@ -147,12 +177,14 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
-        use_sim_time_arg,
+        # use_sim_time_arg,
+        device_id_arg,
         gz_sim,
         robot_state_publisher,
-        clock_bridge,
+        # clock_bridge,
         spawn_delayed,
         spawn_jsb,
         spawn_fcc,
-        relay_node
+        relay_node,
+        joy_teleop
     ])

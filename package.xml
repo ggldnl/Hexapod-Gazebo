@@ -13,6 +13,9 @@
   <depend>sensor_msgs</depend>
   <depend>std_msgs</depend>
 
+  <!-- Joy node to control the robot -->
+  <depend>joy</depend>
+
   <!-- Gazebo Harmonic integration -->
   <depend>ros_gz_sim</depend>
   <depend>ros_gz_bridge</depend>

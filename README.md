@@ -92,12 +92,16 @@ This is not the intended way to control the Hexapod. Skip to [the next section](
 
 - Launch `teleop_twist_joy` on your machine. Adapt this command to match your controller. You can launch the node with no arguments and listen to `/joy` to know what button does what. The `-r` argument repams `/cmd_vel` to `/hexapod/cmd_vel_norm`. The `norm` variant of this command accepts messages with normalized velocity (range -1, 1); you can publish actual velocities on `/hexapod/cmd_vel` instead. 
   ```bash
+  # left joystick axis 1 for backward/forward movement
+  # left joystick axis 0 for right/left movement
+  # right joystick axis 3 for yaw rotation
+  
   ros2 run teleop_twist_joy teleop_node \
     --ros-args \
-    -p axis_linear.x:=1 \  # left joystick axis 1 for backward/forward movement
-    -p axis_linear.y:=0 \  # left joystick axis 0 for right/left movement
-    -p axis_angular.yaw:=3 \  # right joystick axis 2 for clockwise/counterclockwise rotation during gait
-    -p enable_button:=5 \  # enable button, should be pressed at all times
+    -p axis_linear.x:=1 \
+    -p axis_linear.y:=0 \
+    -p axis_angular.yaw:=3 \
+    -p enable_button:=5 \
     -p scale_linear.x:=1.0 \
     -p scale_linear.y:=1.0 \
     -p scale_angular.yaw:=1.0 \

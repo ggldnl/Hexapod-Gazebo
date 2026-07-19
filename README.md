@@ -1,7 +1,7 @@
 # ROS2 Hexapod Gazebo
 
 <div align="center">
-    <img src="media/preview.png" alt="Preview">
+    <img src="media/demo.gif" alt="Preview">
 </div>
 
 This repository contains a ROS2 launch file to load the robot on Gazebo and control it.

@@ -28,7 +28,7 @@ class JointCommandBridge(Node):
         )
         self.create_timer(1.0 / rate, self._publish)
         self.get_logger().info(
-            f"Bridge ready — {len(self._joint_names)} joints at {rate} Hz"
+            f"Bridge ready, {len(self._joint_names)} joints at {rate} Hz"
         )
 
     def _cb(self, msg: JointState) -> None:

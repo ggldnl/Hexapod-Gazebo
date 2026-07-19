@@ -104,7 +104,9 @@ def generate_launch_description():
         parameters=[{
             "robot_description": robot_description,
             # "use_sim_time": use_sim_time,
-            "use_sim_time": True,
+            # Wall clock, matching the note above: the robot drives the timing and
+            # the /clock bridge is disabled, so sim time would never advance here
+            "use_sim_time": False,
         }],
         # Publishes to /controller_manager/robot_description so the
         # controller_manager receives the URDF over the topic it subscribes to.

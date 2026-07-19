@@ -42,7 +42,7 @@ source install/setup.bash
 
 ## 🚀 Delpoy
 
-- Launch the [controller node](https://github.com/ggldnl/Hexapod-ROS-Python.git) on the hexapod. This will listen to `/hexapod/cmd_vel` and `/hexapod/cmd_pose`, control the robot accordingly and stream `/hexapod/odom` and `/hexapod/joint_values` (among other things).
+- Launch the [controller node](https://github.com/ggldnl/Hexapod-ROS-Python.git) on the hexapod. The board runs the whole control loop; the node provisions it at startup, stands it up, then streams your setpoints (`/hexapod/cmd_vel`, `/hexapod/cmd_pose`, ...) and republishes telemetry (`/hexapod/odom`, `/hexapod/joint_values`, ...). Gazebo mirrors the streamed joint values, so it shows exactly what the real robot is doing.
   ```bash
   ros2 run hexapod_controller hexapod_controller
   ```
@@ -59,6 +59,8 @@ The launch file will:
   - Start a bridge node listening on /hexapod/joint_values to update the simulation
   - Start a node listening to Joy messages to produce /hexapod/cmd_vel_norm and /hexapod/cmd_height messages
 
+> Note: the robot boots in the OFF state and folded on the ground. Stand it up explicitly with the stand-up button (or `ros2 topic pub /hexapod/enable std_msgs/msg/Bool "{data: true}" --once`), and fold it back down with the sit-down button (`{data: false}`). The controller node streams heartbeats continuously; if those heartbeats stop, the board sits back down and goes OFF on its own.
+
 You can check controller status with:
 ```bash
 ros2 control list_controllers
@@ -68,9 +70,9 @@ ros2 control list_controllers
 
 Note: commands are fire-and-forget.
 
-- Move forward at 100 mm/s:
+- Move forward at 100 mm/s. `/hexapod/cmd_vel` is in SI units (m/s, rad/s), so 100 mm/s is `0.1`:
   ```bash
-  ros2 topic pub /hexapod/cmd_vel geometry_msgs/msg/Twist "{linear: {x: 100.0, y: 0.0, z: 0.0}, angular: {z: 0.0}}" --once
+  ros2 topic pub /hexapod/cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.1, y: 0.0, z: 0.0}, angular: {z: 0.0}}" --once
   ```
 
 - Change body pose:
@@ -115,8 +117,14 @@ This is not the intended way to control the Hexapod. Skip to [the next section](
 
 ### Using my custom node
 
-The Gazebo launch file also launches a custom node that should allow for better interaction with the hexapod. Using `teleop_twist_joy` we are bound to produce only `/cmd_vel` commands (mapped to `/hexapod/cmd_vel_norm`) but we might also want to control the body pose on a different topic. The custom node provides a way to do this.
-If you don't want to use Gazebo and you are interested only into controlling the Hexapod with a controller, you can launch the node by itself:
+The Gazebo launch file also launches a custom node that should allow for better interaction with the hexapod. Using `teleop_twist_joy` we are bound to produce only `/cmd_vel` commands (mapped to `/hexapod/cmd_vel_norm`) but we might also want to control the body pose or the robot lifecycle on different topics. The custom node provides a way to do this. Its button map (edit the constants at the top of `joy_teleop_node.py` to match your controller):
+
+  - Stand up (enable): button 3
+  - Sit down (shutdown): button 0
+  - Hold to move (deadman): button 5, velocity is only sent while this is held
+  - Body height up / down: buttons 6 / 7
+
+Stand the robot up first, then hold the deadman and use the sticks to walk. If you don't want to use Gazebo and you are interested only into controlling the Hexapod with a controller, you can launch the node by itself:
 
 ```
 ros2 launch hexapod_gazebo joy_teleop.launch.py joy_device_id:=0

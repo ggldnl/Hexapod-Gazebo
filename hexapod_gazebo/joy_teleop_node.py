@@ -9,6 +9,7 @@ AXIS_LINEAR_X   = 1
 AXIS_LINEAR_Y   = 0
 AXIS_ANGULAR_Z  = 3
 AXIS_BODY_PITCH = 4    # Right stick vertical, negate below if the tilt feels inverted
+AXIS_BODY_YAW   = AXIS_ANGULAR_Z   # Same stick axis, the deadman picks which one it drives
 
 # Axis values with a magnitude below this are treated as zero (stick noise and drift)
 AXIS_DEADZONE = 0.05
@@ -24,8 +25,9 @@ BUTTON_GAIT      = 2   # Cycle gait (tripod -> wave -> ripple)
 # Height is in mm, sent directly, there is no normalized equivalent
 HEIGHT_STEP = 2.0
 
-# Body pitch: the right stick maps to +-PITCH_MAX degrees (match safety.pitch_range)
+# Body pitch and yaw: the right stick maps to +-PITCH_MAX / +-YAW_MAX degrees (match safety.pitch_range)
 PITCH_MAX = 10.0  # TODO take this from the config instead
+YAW_MAX = 15.0    # TODO take this from the config instead
 
 # Gait cycle order for BUTTON_GAIT
 GAITS = ("tripod", "wave", "ripple")
@@ -45,6 +47,7 @@ class JoyTeleopNode(Node):
         self._prev_buttons = []
         self._was_moving = False
         self._last_pitch = 0.0
+        self._last_yaw = 0.0
         self._gait_index = 0
 
         # Normalized velocity: axes map directly to [-1, 1], the value is then scaled to the actual
@@ -52,6 +55,7 @@ class JoyTeleopNode(Node):
         self._cmd_vel_pub = self.create_publisher(Twist, '/hexapod/cmd_vel_norm', 10)
         self._cmd_height_pub = self.create_publisher(Float32, '/hexapod/cmd_height', 10)
         self._cmd_pitch_pub = self.create_publisher(Float32, '/hexapod/cmd_pitch', 10)
+        self._cmd_yaw_pub = self.create_publisher(Float32, '/hexapod/cmd_yaw', 10)
         self._cmd_gait_pub = self.create_publisher(String, '/hexapod/cmd_gait', 10)
         self._enable_pub = self.create_publisher(Bool, '/hexapod/enable', 10)
 
@@ -102,11 +106,19 @@ class JoyTeleopNode(Node):
             self._height = self._height - HEIGHT_STEP
             self._publish_height()
 
-        # Body pitch from the right stick, published only when it changes so it stays quiet when centered
-        pitch = round(_deadzone(axes[AXIS_BODY_PITCH]) * PITCH_MAX, 1)
-        if pitch != self._last_pitch:
-            self._last_pitch = pitch
-            self._publish_pitch(pitch)
+        # Body pose from the right stick, only while the deadman is released: while it is held
+        # the same stick steers the walk, so the pose holds its last value. Published only when
+        # it changes so it stays quiet when centered
+        if not moving:
+            pitch = round(_deadzone(axes[AXIS_BODY_PITCH]) * PITCH_MAX, 1)
+            if pitch != self._last_pitch:
+                self._last_pitch = pitch
+                self._publish_pitch(pitch)
+
+            yaw = round(_deadzone(axes[AXIS_BODY_YAW]) * YAW_MAX, 1)
+            if yaw != self._last_yaw:
+                self._last_yaw = yaw
+                self._publish_yaw(yaw)
 
         self._prev_buttons = list(buttons)
 
@@ -120,6 +132,11 @@ class JoyTeleopNode(Node):
         msg = Float32()
         msg.data = pitch
         self._cmd_pitch_pub.publish(msg)
+
+    def _publish_yaw(self, yaw: float):
+        msg = Float32()
+        msg.data = yaw
+        self._cmd_yaw_pub.publish(msg)
 
     def _publish_gait(self, gait: str):
         msg = String()

@@ -11,6 +11,12 @@ AXIS_ANGULAR_Z  = 3
 AXIS_BODY_PITCH = 4    # Right stick vertical, negate below if the tilt feels inverted
 AXIS_BODY_YAW   = AXIS_ANGULAR_Z   # Same stick axis, the deadman picks which one it drives
 
+# Height on the triggers (L2/R2, B6/B7 in a browser gamepad tester). Linux reports
+# them as axes, not buttons: +1.0 released, -1.0 fully pressed, and 0.0 until first touched
+AXIS_HEIGHT_DN  = 2    # L2
+AXIS_HEIGHT_UP  = 5    # R2
+TRIGGER_PRESSED = -0.5  # an axis below this counts as a press
+
 # Axis values with a magnitude below this are treated as zero (stick noise and drift)
 AXIS_DEADZONE = 0.05
 
@@ -18,8 +24,6 @@ AXIS_DEADZONE = 0.05
 BUTTON_MOVE      = 5   # Deadman, hold to send velocity
 BUTTON_STAND_UP  = 3   # Stand up (enable)
 BUTTON_SIT_DOWN  = 0   # Sit down (shutdown)
-BUTTON_HEIGHT_UP = 7
-BUTTON_HEIGHT_DN = 6
 BUTTON_GAIT      = 2   # Cycle gait (tripod -> wave -> ripple)
 
 # Height is in mm, sent directly, there is no normalized equivalent
@@ -46,6 +50,8 @@ class JoyTeleopNode(Node):
 
         self._height = 0.0
         self._prev_buttons = []
+        self._prev_up = False
+        self._prev_down = False
         self._was_moving = False
         self._last_pitch = 0.0
         self._last_yaw = 0.0
@@ -87,9 +93,15 @@ class JoyTeleopNode(Node):
         # Edge-detected buttons (fire once per press)
         stand = buttons[BUTTON_STAND_UP] and not self._prev_buttons[BUTTON_STAND_UP]
         sit   = buttons[BUTTON_SIT_DOWN] and not self._prev_buttons[BUTTON_SIT_DOWN]
-        up    = buttons[BUTTON_HEIGHT_UP] and not self._prev_buttons[BUTTON_HEIGHT_UP]
-        down  = buttons[BUTTON_HEIGHT_DN] and not self._prev_buttons[BUTTON_HEIGHT_DN]
         gait  = buttons[BUTTON_GAIT] and not self._prev_buttons[BUTTON_GAIT]
+
+        # Edge-detected triggers, same once-per-press behaviour as the buttons
+        up_held = axes[AXIS_HEIGHT_UP] < TRIGGER_PRESSED
+        down_held = axes[AXIS_HEIGHT_DN] < TRIGGER_PRESSED
+        up = up_held and not self._prev_up
+        down = down_held and not self._prev_down
+        self._prev_up = up_held
+        self._prev_down = down_held
 
         if stand:
             self._publish_enable(True)

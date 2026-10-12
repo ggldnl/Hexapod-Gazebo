@@ -125,6 +125,8 @@ The Gazebo launch file also launches a custom node that should allow for better 
   - Body height up / down: R2 / L2 triggers (axes 5 / 2, B7 / B6 in a browser gamepad tester)
   - Right stick: body pitch / yaw while the deadman is released, walking yaw rate while it is held
 
+The height and pose limits are not hardcoded: at startup the node reads `z_range`, `pitch_range` and `yaw_range` from the running `hexapod_controller_node`, which exposes them as read-only parameters straight from its config. Walking works right away, but the body pose stays locked until the controller answers (it waits and retries, so the start order does not matter). If the controller runs under another name, pass `--ros-args -p controller_node:=<name>`.
+
 Stand the robot up first, then hold the deadman and use the sticks to walk. If you don't want to use Gazebo and you are interested only into controlling the Hexapod with a controller, you can launch the node by itself:
 
 ```

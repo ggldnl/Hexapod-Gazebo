@@ -1,5 +1,6 @@
 import rclpy
 from rclpy.node import Node
+from rcl_interfaces.srv import GetParameters
 from sensor_msgs.msg import Joy
 from std_msgs.msg import Float32, Bool, String
 from geometry_msgs.msg import Twist
@@ -28,11 +29,11 @@ BUTTON_GAIT      = 2   # Cycle gait (tripod -> wave -> ripple)
 
 # Height is in mm, sent directly, there is no normalized equivalent
 HEIGHT_STEP = 2.0
-HEIGHT_MAX = 20.0  # match safety.z_range, or the offset winds up past what the board accepts
 
-# Body pitch and yaw: the right stick maps to +-PITCH_MAX / +-YAW_MAX degrees (match safety.pitch_range)
-PITCH_MAX = 10.0  # TODO take this from the config instead
-YAW_MAX = 15.0    # TODO take this from the config instead
+# Body-pose limits, [min, max] each, read from the controller node, which publishes
+# them as parameters straight from the config (safety.z_range and so on). Height is
+# clamped to z_range, and the right stick spans pitch_range / yaw_range
+RANGE_PARAMS = ('z_range', 'pitch_range', 'yaw_range')
 
 # Gait cycle order for BUTTON_GAIT
 GAITS = ("tripod", "wave", "ripple")
@@ -41,6 +42,11 @@ GAITS = ("tripod", "wave", "ripple")
 def _deadzone(value):
     # Treat small axis noise and drift as no input
     return value if abs(value) >= AXIS_DEADZONE else 0.0
+
+
+def _scale(value, limits):
+    # Map an axis in [-1, 1] onto a [min, max] range, so 0 stays 0 even when it is asymmetric
+    return value * (limits[1] if value > 0 else -limits[0])
 
 
 class JoyTeleopNode(Node):
@@ -56,6 +62,10 @@ class JoyTeleopNode(Node):
         self._last_pitch = 0.0
         self._last_yaw = 0.0
         self._gait_index = 0
+        self._limits = None  # {param: [min, max]}, None until fetched from the controller
+
+        self.declare_parameter('controller_node', 'hexapod_controller_node')
+        controller = self.get_parameter('controller_node').get_parameter_value().string_value
 
         # Normalized velocity: axes map directly to [-1, 1], the value is then scaled to the actual
         # velocity range by the hexapod based on the config yaml
@@ -67,7 +77,36 @@ class JoyTeleopNode(Node):
         self._enable_pub = self.create_publisher(Bool, '/hexapod/enable', 10)
 
         self.create_subscription(Joy, '/joy', self._joy_cb, 10)
+
+        # The controller may start after the teleop (or on another machine), so keep
+        # asking until it answers. Walking works meanwhile, only the body pose waits
+        self._params_client = self.create_client(GetParameters, f'/{controller}/get_parameters')
+        self._params_pending = False
+        self._params_timer = self.create_timer(1.0, self._fetch_limits)
+        self._fetch_limits()
         self.get_logger().info('JoyTeleopNode started')
+
+    def _fetch_limits(self):
+        if self._limits is not None or self._params_pending:
+            return
+        if not self._params_client.service_is_ready():
+            self.get_logger().info(f'waiting for {self._params_client.srv_name} to read the body limits',
+                                   throttle_duration_sec=5.0)
+            return
+        self._params_pending = True
+        request = GetParameters.Request(names=list(RANGE_PARAMS))
+        self._params_client.call_async(request).add_done_callback(self._on_limits)
+
+    def _on_limits(self, future):
+        self._params_pending = False
+        values = future.result().values if future.result() else []
+        limits = {name: list(v.double_array_value) for name, v in zip(RANGE_PARAMS, values)}
+        if len(limits) != len(RANGE_PARAMS) or any(len(v) != 2 for v in limits.values()):
+            self.get_logger().warn('controller did not report the body limits, retrying')
+            return
+        self._limits = limits
+        self._params_timer.cancel()
+        self.get_logger().info('body limits: ' + ', '.join(f'{k} {v}' for k, v in limits.items()))
 
     def _joy_cb(self, msg: Joy):
         buttons = msg.buttons
@@ -112,28 +151,35 @@ class JoyTeleopNode(Node):
             self._gait_index = (self._gait_index + 1) % len(GAITS)
             self._publish_gait(GAITS[self._gait_index])
 
+        self._prev_buttons = list(buttons)
+
+        # Everything below moves the body pose, which needs the limits from the controller
+        if self._limits is None:
+            if up or down:
+                self.get_logger().warn('body limits not received yet, ignoring the height command')
+            return
+
+        z_min, z_max = self._limits['z_range']
         if up:
-            self._height = min(self._height + HEIGHT_STEP, HEIGHT_MAX)
+            self._height = min(self._height + HEIGHT_STEP, z_max)
             self._publish_height()
         elif down:
-            self._height = max(self._height - HEIGHT_STEP, -HEIGHT_MAX)
+            self._height = max(self._height - HEIGHT_STEP, z_min)
             self._publish_height()
 
         # Body pose from the right stick, only while the deadman is released: while it is held
         # the same stick steers the walk, so the pose holds its last value. Published only when
         # it changes so it stays quiet when centered
         if not moving:
-            pitch = round(_deadzone(axes[AXIS_BODY_PITCH]) * PITCH_MAX, 1)
+            pitch = round(_scale(_deadzone(axes[AXIS_BODY_PITCH]), self._limits['pitch_range']), 1)
             if pitch != self._last_pitch:
                 self._last_pitch = pitch
                 self._publish_pitch(pitch)
 
-            yaw = round(_deadzone(axes[AXIS_BODY_YAW]) * YAW_MAX, 1)
+            yaw = round(_scale(_deadzone(axes[AXIS_BODY_YAW]), self._limits['yaw_range']), 1)
             if yaw != self._last_yaw:
                 self._last_yaw = yaw
                 self._publish_yaw(yaw)
-
-        self._prev_buttons = list(buttons)
 
     def _publish_height(self):
         msg = Float32()

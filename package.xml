@@ -12,6 +12,7 @@
   <depend>robot_state_publisher</depend>
   <depend>sensor_msgs</depend>
   <depend>std_msgs</depend>
+  <depend>rcl_interfaces</depend>
 
   <!-- Joy node to control the robot -->
   <depend>joy</depend>

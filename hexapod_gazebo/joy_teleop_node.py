@@ -18,8 +18,8 @@ AXIS_DEADZONE = 0.05
 BUTTON_MOVE      = 5   # Deadman, hold to send velocity
 BUTTON_STAND_UP  = 3   # Stand up (enable)
 BUTTON_SIT_DOWN  = 0   # Sit down (shutdown)
-BUTTON_HEIGHT_UP = 6
-BUTTON_HEIGHT_DN = 7
+BUTTON_HEIGHT_UP = 7
+BUTTON_HEIGHT_DN = 6
 BUTTON_GAIT      = 2   # Cycle gait (tripod -> wave -> ripple)
 
 # Height is in mm, sent directly, there is no normalized equivalent

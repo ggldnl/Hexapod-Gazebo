@@ -122,7 +122,7 @@ The Gazebo launch file also launches a custom node that should allow for better 
   - Stand up (enable): button 3
   - Sit down (shutdown): button 0
   - Hold to move (deadman): button 5, velocity is only sent while this is held
-  - Body height up / down: buttons 6 / 7
+  - Body height up / down: buttons 7 / 6
   - Right stick: body pitch / yaw while the deadman is released, walking yaw rate while it is held
 
 Stand the robot up first, then hold the deadman and use the sticks to walk. If you don't want to use Gazebo and you are interested only into controlling the Hexapod with a controller, you can launch the node by itself:

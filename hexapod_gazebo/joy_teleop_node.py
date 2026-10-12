@@ -24,6 +24,7 @@ BUTTON_GAIT      = 2   # Cycle gait (tripod -> wave -> ripple)
 
 # Height is in mm, sent directly, there is no normalized equivalent
 HEIGHT_STEP = 2.0
+HEIGHT_MAX = 20.0  # match safety.z_range, or the offset winds up past what the board accepts
 
 # Body pitch and yaw: the right stick maps to +-PITCH_MAX / +-YAW_MAX degrees (match safety.pitch_range)
 PITCH_MAX = 10.0  # TODO take this from the config instead
@@ -100,10 +101,10 @@ class JoyTeleopNode(Node):
             self._publish_gait(GAITS[self._gait_index])
 
         if up:
-            self._height = self._height + HEIGHT_STEP
+            self._height = min(self._height + HEIGHT_STEP, HEIGHT_MAX)
             self._publish_height()
         elif down:
-            self._height = self._height - HEIGHT_STEP
+            self._height = max(self._height - HEIGHT_STEP, -HEIGHT_MAX)
             self._publish_height()
 
         # Body pose from the right stick, only while the deadman is released: while it is held

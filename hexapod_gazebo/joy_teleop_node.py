@@ -102,7 +102,13 @@ class JoyTeleopNode(Node):
         values = future.result().values if future.result() else []
         limits = {name: list(v.double_array_value) for name, v in zip(RANGE_PARAMS, values)}
         if len(limits) != len(RANGE_PARAMS) or any(len(v) != 2 for v in limits.values()):
-            self.get_logger().warn('controller did not report the body limits, retrying')
+            # The controller answered but does not have them, so asking again will not help
+            # and only floods its log. Walking still works, the body pose stays locked
+            self._params_timer.cancel()
+            self.get_logger().error(
+                'the controller does not expose the body limits, it is an older build: update '
+                'hexapod_controller to new-tibia and rebuild it, then restart this node. '
+                'Height, pitch and yaw are disabled until then')
             return
         self._limits = limits
         self._params_timer.cancel()
